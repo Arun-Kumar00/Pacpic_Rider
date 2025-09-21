@@ -183,14 +183,193 @@
 //     );
 //   }
 // }
+// import 'package:flutter/material.dart';
+// import 'package:firebase_auth/firebase_auth.dart';
+// import 'package:firebase_database/firebase_database.dart';
+// import 'package:intl/intl.dart';
+// import 'package:pacpic_rider/views/ride_navigation_screen.dart'; // Import the navigation screen
+//
+// class HistoryScreen extends StatefulWidget {
+//   // It now requires the riderId
+//   final String riderId;
+//   const HistoryScreen({super.key, required this.riderId});
+//
+//   @override
+//   State<HistoryScreen> createState() => _HistoryScreenState();
+// }
+//
+// class _HistoryScreenState extends State<HistoryScreen> {
+//   // State variables
+//   List<DataSnapshot> _completedOrders = [];
+//   DataSnapshot? _activeOrder; // To hold the current accepted ride
+//   double _totalEarnings = 0.0;
+//   bool _isLoading = true;
+//
+//   @override
+//   void initState() {
+//     super.initState();
+//     _fetchOrders();
+//   }
+//
+//   /// Fetches both active and completed orders for the rider.
+//   Future<void> _fetchOrders() async {
+//     // Reset state before fetching
+//     if (mounted) {
+//       setState(() {
+//         _isLoading = true;
+//         _activeOrder = null;
+//         _completedOrders = [];
+//         _totalEarnings = 0.0;
+//       });
+//     }
+//
+//     try {
+//       final snapshot = await FirebaseDatabase.instance
+//           .ref('orders')
+//           .orderByChild('riderId')
+//           .equalTo(widget.riderId) // Use the passed-in riderId
+//           .get();
+//
+//       if (mounted && snapshot.exists) {
+//         double earnings = 0.0;
+//         final completed = <DataSnapshot>[];
+//         DataSnapshot? active;
+//
+//         for (final orderSnapshot in snapshot.children) {
+//           final data = Map<String, dynamic>.from(orderSnapshot.value as Map);
+//           final status = data['status'] as String?;
+//
+//           if (status == 'completed') {
+//             completed.add(orderSnapshot);
+//             final double restaurantPrice = (data['price'] ?? 0.0).toDouble();
+//             earnings += (restaurantPrice * 15 / 25);
+//           }
+//           // --- THIS IS THE NEW LOGIC ---
+//           // Check if the order is active (accepted but not completed)
+//           else if (status == 'accepted') {
+//             active = orderSnapshot; // Found the active ride
+//           }
+//         }
+//
+//         completed.sort((a, b) {
+//           final aData = Map<String, dynamic>.from(a.value as Map);
+//           final bData = Map<String, dynamic>.from(b.value as Map);
+//           return (bData['createdAt'] as int).compareTo(aData['createdAt'] as int);
+//         });
+//
+//         setState(() {
+//           _completedOrders = completed;
+//           _activeOrder = active;
+//           _totalEarnings = earnings;
+//         });
+//       }
+//     } catch (e) {
+//       debugPrint("Error fetching history: $e");
+//     }
+//
+//     if (mounted) {
+//       setState(() {
+//         _isLoading = false;
+//       });
+//     }
+//   }
+//
+//   /// Navigates the rider back to the active ride's navigation screen.
+//   void _navigateToActiveRide() {
+//     if (_activeOrder == null) return;
+//
+//     final orderId = _activeOrder!.key!;
+//     Navigator.of(context).push(
+//       MaterialPageRoute(builder: (_) => RideNavigationScreen(orderId: orderId)),
+//     );
+//   }
+//
+//   @override
+//   Widget build(BuildContext context) {
+//     if (_isLoading) {
+//       return const Center(child: CircularProgressIndicator());
+//     }
+//
+//     return RefreshIndicator(
+//       onRefresh: _fetchOrders,
+//       child: Column(
+//         children: [
+//           // --- NEW WIDGET: Display the active ride card if one exists ---
+//           if (_activeOrder != null)
+//             Card(
+//               color: Colors.blue.shade50,
+//               margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+//               elevation: 4,
+//               child: ListTile(
+//                 leading: const Icon(Icons.delivery_dining, color: Colors.blue, size: 36),
+//                 title: const Text('Active Ride In Progress', style: TextStyle(fontWeight: FontWeight.bold)),
+//                 subtitle: const Text('Tap here to continue your delivery'),
+//                 trailing: const Icon(Icons.arrow_forward_ios, color: Colors.blue),
+//                 onTap: _navigateToActiveRide,
+//               ),
+//             ),
+//
+//           // Your existing UI for earnings and history
+//           Card(
+//             margin: const EdgeInsets.all(12),
+//             child: Padding(
+//               padding: const EdgeInsets.all(16.0),
+//               child: Column(
+//                 crossAxisAlignment: CrossAxisAlignment.stretch,
+//                 children: [
+//                   Text(
+//                     'Total Earnings',
+//                     textAlign: TextAlign.center,
+//                     style: Theme.of(context).textTheme.titleMedium,
+//                   ),
+//                   Text(
+//                     '₹${_totalEarnings.toStringAsFixed(2)}',
+//                     textAlign: TextAlign.center,
+//                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+//                       fontWeight: FontWeight.bold,
+//                       color: Colors.green.shade700,
+//                     ),
+//                   ),
+//                 ],
+//               ),
+//             ),
+//           ),
+//
+//           if (_completedOrders.isEmpty)
+//             const Expanded(
+//                 child: Center(child: Text('You have no completed rides.')))
+//           else
+//             Expanded(
+//               child: ListView.builder(
+//                 itemCount: _completedOrders.length,
+//                 itemBuilder: (context, index) {
+//                   final orderData = Map<String, dynamic>.from(_completedOrders[index].value as Map);
+//                   final createdAt = DateTime.fromMillisecondsSinceEpoch(orderData['createdAt']);
+//                   final formattedDate = DateFormat('dd MMM yyyy, hh:mm a').format(createdAt);
+//                   final double restaurantPrice = (orderData['price'] ?? 0.0).toDouble();
+//                   final double riderEarning = restaurantPrice * 15 / 25;
+//
+//                   return ListTile(
+//                     leading: const Icon(Icons.check_circle_outline, color: Colors.green),
+//                     title: Text(orderData['restaurantName'] ?? 'Completed Ride'),
+//                     subtitle: Text('On $formattedDate'),
+//                     trailing: Text('₹${riderEarning.toStringAsFixed(2)}'),
+//                   );
+//                 },
+//               ),
+//             ),
+//         ],
+//       ),
+//     );
+//   }
+// }
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
 import 'package:intl/intl.dart';
-import 'package:pacpic_rider/views/ride_navigation_screen.dart'; // Import the navigation screen
+import 'package:pacpic_rider/views/ride_navigation_screen.dart';
 
 class HistoryScreen extends StatefulWidget {
-  // It now requires the riderId
   final String riderId;
   const HistoryScreen({super.key, required this.riderId});
 
@@ -199,10 +378,11 @@ class HistoryScreen extends StatefulWidget {
 }
 
 class _HistoryScreenState extends State<HistoryScreen> {
-  // State variables
   List<DataSnapshot> _completedOrders = [];
-  DataSnapshot? _activeOrder; // To hold the current accepted ride
-  double _totalEarnings = 0.0;
+  DataSnapshot? _activeOrder;
+  // NEW: Separate totals for paid and unpaid earnings
+  double _unpaidEarnings = 0.0;
+  double _totalPaidEarnings = 0.0;
   bool _isLoading = true;
 
   @override
@@ -211,15 +391,14 @@ class _HistoryScreenState extends State<HistoryScreen> {
     _fetchOrders();
   }
 
-  /// Fetches both active and completed orders for the rider.
   Future<void> _fetchOrders() async {
-    // Reset state before fetching
     if (mounted) {
       setState(() {
         _isLoading = true;
         _activeOrder = null;
         _completedOrders = [];
-        _totalEarnings = 0.0;
+        _unpaidEarnings = 0.0;
+        _totalPaidEarnings = 0.0;
       });
     }
 
@@ -227,11 +406,12 @@ class _HistoryScreenState extends State<HistoryScreen> {
       final snapshot = await FirebaseDatabase.instance
           .ref('orders')
           .orderByChild('riderId')
-          .equalTo(widget.riderId) // Use the passed-in riderId
+          .equalTo(widget.riderId)
           .get();
 
       if (mounted && snapshot.exists) {
-        double earnings = 0.0;
+        double unpaid = 0.0;
+        double paid = 0.0;
         final completed = <DataSnapshot>[];
         DataSnapshot? active;
 
@@ -242,12 +422,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
           if (status == 'completed') {
             completed.add(orderSnapshot);
             final double restaurantPrice = (data['price'] ?? 0.0).toDouble();
-            earnings += (restaurantPrice * 15 / 25);
-          }
-          // --- THIS IS THE NEW LOGIC ---
-          // Check if the order is active (accepted but not completed)
-          else if (status == 'accepted') {
-            active = orderSnapshot; // Found the active ride
+            final earning = (restaurantPrice * 15 / 25);
+
+            // NEW: Check if the order has been paid out
+            if (data['isPaidToRider'] == true) {
+              paid += earning;
+            } else {
+              unpaid += earning;
+            }
+          } else if (status == 'accepted') {
+            active = orderSnapshot;
           }
         }
 
@@ -260,27 +444,21 @@ class _HistoryScreenState extends State<HistoryScreen> {
         setState(() {
           _completedOrders = completed;
           _activeOrder = active;
-          _totalEarnings = earnings;
+          _unpaidEarnings = unpaid;
+          _totalPaidEarnings = paid;
         });
       }
     } catch (e) {
       debugPrint("Error fetching history: $e");
     }
 
-    if (mounted) {
-      setState(() {
-        _isLoading = false;
-      });
-    }
+    if (mounted) setState(() => _isLoading = false);
   }
 
-  /// Navigates the rider back to the active ride's navigation screen.
   void _navigateToActiveRide() {
     if (_activeOrder == null) return;
-
-    final orderId = _activeOrder!.key!;
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => RideNavigationScreen(orderId: orderId)),
+      MaterialPageRoute(builder: (_) => RideNavigationScreen(orderId: _activeOrder!.key!)),
     );
   }
 
@@ -294,7 +472,6 @@ class _HistoryScreenState extends State<HistoryScreen> {
       onRefresh: _fetchOrders,
       child: Column(
         children: [
-          // --- NEW WIDGET: Display the active ride card if one exists ---
           if (_activeOrder != null)
             Card(
               color: Colors.blue.shade50,
@@ -309,7 +486,7 @@ class _HistoryScreenState extends State<HistoryScreen> {
               ),
             ),
 
-          // Your existing UI for earnings and history
+          // UPDATED: Earnings card now shows unpaid amount
           Card(
             margin: const EdgeInsets.all(12),
             child: Padding(
@@ -318,16 +495,16 @@ class _HistoryScreenState extends State<HistoryScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   Text(
-                    'Total Earnings',
+                    'Outstanding Payment (Unpaid)',
                     textAlign: TextAlign.center,
-                    style: Theme.of(context).textTheme.titleMedium,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(color: Colors.orange.shade800),
                   ),
                   Text(
-                    '₹${_totalEarnings.toStringAsFixed(2)}',
+                    '₹${_unpaidEarnings.toStringAsFixed(2)}',
                     textAlign: TextAlign.center,
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
                       fontWeight: FontWeight.bold,
-                      color: Colors.green.shade700,
+                      color: Colors.orange.shade800,
                     ),
                   ),
                 ],
@@ -348,12 +525,26 @@ class _HistoryScreenState extends State<HistoryScreen> {
                   final formattedDate = DateFormat('dd MMM yyyy, hh:mm a').format(createdAt);
                   final double restaurantPrice = (orderData['price'] ?? 0.0).toDouble();
                   final double riderEarning = restaurantPrice * 15 / 25;
+                  // NEW: Check payment status for each ride
+                  final bool isPaid = orderData['isPaidToRider'] == true;
 
                   return ListTile(
-                    leading: const Icon(Icons.check_circle_outline, color: Colors.green),
+                    leading: Icon(
+                      isPaid ? Icons.check_circle : Icons.hourglass_empty,
+                      color: isPaid ? Colors.green : Colors.orange,
+                    ),
                     title: Text(orderData['restaurantName'] ?? 'Completed Ride'),
                     subtitle: Text('On $formattedDate'),
-                    trailing: Text('₹${riderEarning.toStringAsFixed(2)}'),
+                    // Show earning and a "Paid" chip
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text('₹${riderEarning.toStringAsFixed(2)}'),
+                        const SizedBox(width: 8),
+                        if (isPaid)
+                          const Chip(label: Text('Paid'), backgroundColor: Colors.greenAccent, padding: EdgeInsets.all(2)),
+                      ],
+                    ),
                   );
                 },
               ),

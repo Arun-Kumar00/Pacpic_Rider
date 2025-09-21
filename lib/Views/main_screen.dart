@@ -156,6 +156,7 @@ import 'package:firebase_database/firebase_database.dart';
 import 'package:pacpic_rider/views/available_rides_screen.dart';
 import 'package:pacpic_rider/views/history_screen.dart';
 import 'package:pacpic_rider/views/rider_profile_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class MainScreen extends StatefulWidget {
   const MainScreen({super.key});
@@ -191,6 +192,8 @@ class _MainScreenState extends State<MainScreen> {
     }
   }
 
+
+
   void _showHelplineDialog() {
     showDialog(
       context: context,
@@ -215,10 +218,7 @@ class _MainScreenState extends State<MainScreen> {
               return const Text('Could not load helpline number.');
             }
             if (snapshot.hasData && snapshot.data!.exists) {
-              // --- THIS IS THE FIX ---
-              // Use .toString() to safely convert the value to a string
               final phoneNumber = snapshot.data!.value.toString();
-              // --- END OF FIX ---
 
               return Column(
                 mainAxisSize: MainAxisSize.min,
@@ -226,17 +226,22 @@ class _MainScreenState extends State<MainScreen> {
                 children: [
                   const Text('For any issues, please contact:'),
                   const SizedBox(height: 8),
-                  Text(phoneNumber, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  Text(phoneNumber,
+                      style: const TextStyle(
+                          fontWeight: FontWeight.bold, fontSize: 16)),
                   const SizedBox(height: 12),
                   TextButton.icon(
-                    icon: const Icon(Icons.copy),
-                    label: const Text('Copy Number'),
-                    onPressed: () {
-                      Clipboard.setData(ClipboardData(text: phoneNumber));
-                      Navigator.of(ctx).pop();
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Phone number copied to clipboard!')),
-                      );
+                    icon: const Icon(Icons.call),
+                    label: const Text('Call Now'),
+                    onPressed: () async {
+                      final Uri callUri = Uri(scheme: 'tel', path: phoneNumber);
+                      if (await canLaunchUrl(callUri)) {
+                        await launchUrl(callUri);
+                      } else {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Could not open dialer.')),
+                        );
+                      }
                     },
                   )
                 ],
@@ -254,6 +259,7 @@ class _MainScreenState extends State<MainScreen> {
       ),
     );
   }
+
 
   static const List<String> _titles = <String>[
     'Available Rides',
